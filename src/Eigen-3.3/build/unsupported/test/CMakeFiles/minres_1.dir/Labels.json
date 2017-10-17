@@ -1,0 +1,15 @@
+
+{
+	"sources" : 
+	[
+		
+		{
+			"file" : "/home/khush/self_driving_car/CarND-Path-Planning-Project/src/Eigen-3.3/unsupported/test/minres.cpp"
+		}
+	],
+	"target" : 
+	{
+		"labels" : [ "BuildUnsupported" ],
+		"name" : "minres_1"
+	}
+}

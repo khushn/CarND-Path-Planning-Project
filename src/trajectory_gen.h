@@ -5,6 +5,11 @@
 
 using namespace std;
 
-vector<double> generate_trajectory(double s0, double ds0, double d2s0, 
-								   double sf, double dsf, double d2sf);
+/**
+We find the coefficients of the polynomial such that, all coefficients for degree > 5 are 0. 
+in the polynomial. Such a polynomial is smooth having less jerks
+**/
+vector<double> generate_poly_coefficients(vector< double> start, vector <double> end, double T);
+
+vector<double> generate_points_using_poly(vector<double> coeffs, double time_interval=.020, int N=50);
 #endif
