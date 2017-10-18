@@ -33,8 +33,7 @@ vector<double> generate_poly_coefficients(vector< double> start, vector <double>
 	return {a0, a1, a2, coeffs[0], coeffs[1], coeffs[2] };
 }
 
-vector<double> generate_points_using_poly(vector<double> coeffs, double time_interval, 
-	int N){
+vector<double> generate_points_using_poly(vector<double> coeffs, int N, double time_interval){
 	vector<double> vals;
 	if (coeffs.size() < 6) {
 		cerr << "Error in generate_points_using_poly(). Insufficient coefficients in polynomial" 
@@ -47,4 +46,49 @@ vector<double> generate_points_using_poly(vector<double> coeffs, double time_int
 
 	}
 	return vals;
+}
+
+vector<double> get_end_vals(vector<double> start, int N, double dt, 
+	double max_speed, double max_accl, double max_jerk) {
+	//vector<double> tmp;
+	double x = start[0];
+	//tmp.push_back(x);
+	double v = start[1];
+	double a = start[2];
+	for(int i=0; i<N; i++) {
+		x += v*dt;
+		//tmp.push_back(x);
+
+		// compute speed for next iteration
+		v += a*dt;
+		if (v > max_speed) {			
+			v = max_speed;
+		}
+
+		// compute accleration for next iteration
+		double a2 = (max_speed - v) / dt;
+		if (abs(a2) > max_accl) {
+			int sign = 1;
+			if (a2 < 0) 
+				sign = -1;
+			a2 = max_accl * sign;
+		}
+
+		double jerk = (a2 - a) / dt;
+		if (abs(jerk) > max_jerk ) {
+			int sign = 1;
+			if (jerk < 0)
+				sign = -1;
+			jerk = max_jerk * sign;
+			a2 = a + jerk * dt;
+		}
+		a = a2;		
+	}
+
+
+	vector<double> end(3);
+	end[0] = x;
+	end[1] = v;
+	end[2] = a;
+	return end;
 }

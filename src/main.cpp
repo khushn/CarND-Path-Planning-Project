@@ -20,6 +20,12 @@ constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
 double rad2deg(double x) { return x * 180 / pi(); }
 
+// previously sent last of speed and acceleration values
+double prev_speed = 0.;
+double prev_acc = 0.;
+// The path length sent to simulator
+int path_length_sent=0;
+
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
 // else the empty string "" will be returned.
@@ -236,22 +242,69 @@ int main() {
 
           	json msgJson;
 
+            //const double TARGET_SPEED = 10;
+            const double TARGET_SPEED = 22.22; // 22 metres/ sec translates to 50 miles/hr
+            const double MAX_ACCL = 10; // 10 metre/sec^2
+            const double MAX_JERK = 10; // 10 metre/sec^3
+            const double TIME_DELTA = .020; // 20 milisec
+            const int N = 50; // points into future
+
           	vector<double> next_x_vals;
           	vector<double> next_y_vals;
 
+             // 1st convert the speed from miles/hr to metres / sec
+            car_speed *= 1.60934 * 1000 / (60 * 60);
+            cout << "----------------------------" << endl;
+            cout << "car_speed: " << car_speed << endl;
+
+            int prev_path_size = previous_path_x.size();
+            cout << "prev path_size: " << prev_path_size << endl; 
+
+            // 2nd just add the remaining of previous path to next path 
+            // for continuity
+            for(int i=0; i<prev_path_size; i++) {              
+              next_x_vals.push_back(previous_path_x[i]);
+              next_y_vals.push_back(previous_path_y[i]);
+            }
+
+            vector<double> start(3), end(3);
+            if (prev_path_size == 0) {
+              // first time 
+              start[0] = car_s;              
+            } else {
+              start[0] = end_path_s;
+            }
+           
+            start[1] = prev_speed;
+            start[2] = prev_acc;           
+            
+            cout << "start vector: " << start[0] << ", " << start[1] << ", " << start[2] << endl;
+
+            int additional_pts = N-prev_path_size;
+            end = get_end_vals(start, additional_pts);
+            cout << "end vector: " << end[0] << ", " << end[1] << ", " << end[2] << endl;
+
+            
+            //cout << "before calling generate_poly_coefficients()" << endl;
+            vector<double> poly_coeffs = generate_poly_coefficients(start, end, additional_pts*TIME_DELTA);
+            //cout << "after calling generate_poly_coefficients()" << endl;
+            vector<double> next_s = generate_points_using_poly(poly_coeffs, additional_pts);
+            
 
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
             double pos_x;
             double pos_y;
-            double d = car_d; // Keep lane
-            double s = car_s;
-            for(int i=0; i<50; i++){
-              vector<double> xy = getXY(s, d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            double d = car_d; // Keep lane            
+            for(int i=0; i<additional_pts; i++){
+              vector<double> xy = getXY(next_s[i], d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
               next_x_vals.push_back(xy[0]);
               next_y_vals.push_back(xy[1]);
               s+=.444;
             }
            
+            prev_speed = end[1];
+            prev_acc = end[2];
+            path_length_sent = next_x_vals.size();
 
           	msgJson["next_x"] = next_x_vals;
           	msgJson["next_y"] = next_y_vals;

@@ -11,5 +11,17 @@ in the polynomial. Such a polynomial is smooth having less jerks
 **/
 vector<double> generate_poly_coefficients(vector< double> start, vector <double> end, double T);
 
-vector<double> generate_points_using_poly(vector<double> coeffs, double time_interval=.020, int N=50);
+/**
+Generate some future points of the polynomial
+*/
+vector<double> generate_points_using_poly(vector<double> coeffs, int N=50,  double time_interval=.020);
+
+
+/**
+Get the end target distance, speed and acceleration. 
+Given; Initial values
+*/
+vector<double> get_end_vals(vector<double> start, int N, double dt = .02,
+	double max_speed = 22.22, double max_accl = 10, double max_jerk = 10);
+
 #endif
