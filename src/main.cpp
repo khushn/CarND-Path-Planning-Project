@@ -242,10 +242,10 @@ int main() {
 
           	json msgJson;
 
-            //const double TARGET_SPEED = 10;
-            const double TARGET_SPEED = 22.22; // 22 metres/ sec translates to 50 miles/hr
-            const double MAX_ACCL = 10; // 10 metre/sec^2
-            const double MAX_JERK = 10; // 10 metre/sec^3
+            const double TARGET_SPEED = 20.0;
+            //const double TARGET_SPEED = 22.22; // 22 metres/ sec translates to 50 miles/hr
+            const double MAX_ACCL = 10.0; // 10 metre/sec^2
+            const double MAX_JERK = 10.0; // 10 metre/sec^3
             const double TIME_DELTA = .020; // 20 milisec
             const int N = 50; // points into future
 
@@ -267,7 +267,7 @@ int main() {
               next_y_vals.push_back(previous_path_y[i]);
             }
 
-            vector<double> start(3), end(3);
+            vector<double> start(3);
             if (prev_path_size == 0) {
               // first time 
               start[0] = car_s;              
@@ -281,29 +281,47 @@ int main() {
             cout << "start vector: " << start[0] << ", " << start[1] << ", " << start[2] << endl;
 
             int additional_pts = N-prev_path_size;
-            end = get_end_vals(start, additional_pts);
+            
+            /**
+            vector<double> end = get_end_vals(start, additional_pts, TIME_DELTA, TARGET_SPEED, MAX_ACCL, MAX_JERK);
             cout << "end vector: " << end[0] << ", " << end[1] << ", " << end[2] << endl;
 
             
             //cout << "before calling generate_poly_coefficients()" << endl;
             vector<double> poly_coeffs = generate_poly_coefficients(start, end, additional_pts*TIME_DELTA);
             //cout << "after calling generate_poly_coefficients()" << endl;
-            vector<double> next_s = generate_points_using_poly(poly_coeffs, additional_pts);
-            
+            vector<double> next_s = generate_points_using_poly(poly_coeffs, additional_pts, TIME_DELTA);
+                        
+            **/
 
-          	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
+            vector<double> traj2 = get_lane_trajectory(&prev_speed, &prev_acc, 
+              start, additional_pts, TIME_DELTA, TARGET_SPEED, MAX_ACCL, MAX_JERK);
+
+          	// define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
             double pos_x;
             double pos_y;
-            double d = car_d; // Keep lane            
+            double d = car_d; // Keep lane 
+            vector<vector<double>> tmp_xy;         
             for(int i=0; i<additional_pts; i++){
-              vector<double> xy = getXY(next_s[i], d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-              next_x_vals.push_back(xy[0]);
-              next_y_vals.push_back(xy[1]);
-              s+=.444;
+              cout << "traj2[" << i << "] = " << traj2[i] << endl;
+              vector<double> xy = getXY(traj2[i], d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+              tmp_xy.push_back(xy);                  
+            }
+
+            // Clean xy's for normal jerk
+            clean_normal_jerk(&prev_speed, &prev_acc, tmp_xy, TIME_DELTA, TARGET_SPEED, MAX_ACCL, MAX_JERK);
+
+            for(int i=0; i<tmp_xy.size(); i++) {
+
+              next_x_vals.push_back(tmp_xy[i][0]);
+              next_y_vals.push_back(tmp_xy[i][1]);       
             }
            
+            /**
             prev_speed = end[1];
             prev_acc = end[2];
+            */
+
             path_length_sent = next_x_vals.size();
 
           	msgJson["next_x"] = next_x_vals;

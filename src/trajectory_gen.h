@@ -14,14 +14,29 @@ vector<double> generate_poly_coefficients(vector< double> start, vector <double>
 /**
 Generate some future points of the polynomial
 */
-vector<double> generate_points_using_poly(vector<double> coeffs, int N=50,  double time_interval=.020);
+vector<double> generate_points_using_poly(vector<double> coeffs, int N,  double time_interval);
 
 
 /**
 Get the end target distance, speed and acceleration. 
 Given; Initial values
 */
-vector<double> get_end_vals(vector<double> start, int N, double dt = .02,
-	double max_speed = 22.22, double max_accl = 10, double max_jerk = 10);
+vector<double> get_end_vals(vector<double> start, int N, double dt,
+	double max_speed, double max_accl, double max_jerk);
+
+/**
+Get the lane trajectory which meets all constraints
+Given; Initial values
+*/
+vector<double> get_lane_trajectory(double *last_pt_v, double * last_pt_a, 
+	vector<double> start, int N, double dt,
+	double max_speed, double max_accl, double max_jerk);
+
+
+/** Make points move more smoothly, reduce turn at every point if normal accl/jerk 
+above threshold
+*/
+void clean_normal_jerk(double *last_pt_v, double * last_pt_a, vector<vector<double>>& xy_list, double dt, double max_speed, 
+						double max_accl, double max_jerk);
 
 #endif
