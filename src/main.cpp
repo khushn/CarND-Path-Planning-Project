@@ -255,8 +255,10 @@ int main() {
              // 1st convert the speed from miles/hr to metres / sec
             car_speed *= 1.60934 * 1000 / (60 * 60);
             cout << "----------------------------" << endl;
-            cout << "car_speed: " << car_speed << endl;
-
+            cout << "car_speed: " << car_speed << endl;            
+            //cout << "car_s: " << car_s << ", car_d: " << car_d <<
+            //        ", end_path_s: "<< end_path_s << ", end_path_d: " << end_path_d << endl;
+            
             int prev_path_size = previous_path_x.size();
             cout << "prev path_size: " << prev_path_size << endl; 
 
@@ -267,12 +269,25 @@ int main() {
               next_y_vals.push_back(previous_path_y[i]);
             }
 
+            double prev_x=0.;
+            double prev_y=0.;
+            double prev_angle=0.;
             vector<double> start(3);
             if (prev_path_size == 0) {
               // first time 
-              start[0] = car_s;              
+              start[0] = car_s;
+              prev_x = car_x;
+              prev_y = car_y;
+              prev_angle = deg2rad(car_yaw);
+
             } else {
               start[0] = end_path_s;
+              prev_x = previous_path_x[prev_path_size-1];
+              prev_y = previous_path_y[prev_path_size-1];
+
+              double pos_x2 = previous_path_x[prev_path_size-2];
+              double pos_y2 = previous_path_y[prev_path_size-2];
+              prev_angle = atan2(prev_y-pos_y2,prev_x-pos_x2);
             }
            
             start[1] = prev_speed;
@@ -294,7 +309,7 @@ int main() {
                         
             **/
 
-            vector<double> traj2 = get_lane_trajectory(&prev_speed, &prev_acc, 
+            vector<double> traj2 = get_lane_trajectory(
               start, additional_pts, TIME_DELTA, TARGET_SPEED, MAX_ACCL, MAX_JERK);
 
           	// define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
@@ -303,13 +318,15 @@ int main() {
             double d = car_d; // Keep lane 
             vector<vector<double>> tmp_xy;         
             for(int i=0; i<additional_pts; i++){
-              cout << "traj2[" << i << "] = " << traj2[i] << endl;
+              //cout << "traj2[" << i << "] = " << traj2[i] << endl;
               vector<double> xy = getXY(traj2[i], d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
               tmp_xy.push_back(xy);                  
             }
 
-            // Clean xy's for normal jerk
-            clean_normal_jerk(&prev_speed, &prev_acc, tmp_xy, TIME_DELTA, TARGET_SPEED, MAX_ACCL, MAX_JERK);
+            // Clean xy's for normal jerk                  
+            clean_normal_jerk(&prev_speed, &prev_acc, prev_angle, 
+                              tmp_xy, prev_x, prev_y, 
+                              TIME_DELTA, TARGET_SPEED, MAX_ACCL, MAX_JERK);
 
             for(int i=0; i<tmp_xy.size(); i++) {
 
