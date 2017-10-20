@@ -273,12 +273,14 @@ int main() {
             double prev_y=0.;
             double prev_angle=0.;
             vector<double> start(3);
+            double d; // Keep lane 
             if (prev_path_size == 0) {
               // first time 
               start[0] = car_s;
               prev_x = car_x;
               prev_y = car_y;
               prev_angle = deg2rad(car_yaw);
+              d = car_d; // keep lane
 
             } else {
               start[0] = end_path_s;
@@ -288,6 +290,7 @@ int main() {
               double pos_x2 = previous_path_x[prev_path_size-2];
               double pos_y2 = previous_path_y[prev_path_size-2];
               prev_angle = atan2(prev_y-pos_y2,prev_x-pos_x2);
+              d = end_path_d;
             }
            
             start[1] = prev_speed;
@@ -297,25 +300,51 @@ int main() {
 
             int additional_pts = N-prev_path_size;
             
-            /**
+            /*
             vector<double> end = get_end_vals(start, additional_pts, TIME_DELTA, TARGET_SPEED, MAX_ACCL, MAX_JERK);
             cout << "end vector: " << end[0] << ", " << end[1] << ", " << end[2] << endl;
 
+
+            vector<double> end_xy = getXY(end[0], d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+
+            // compute direction at end point by using delta s
+            vector<double> end_xy_delta = getXY(end[0]-.5, d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            double end_angle = atan2(end_xy[1]-end_xy_delta[1], end_xy[0]-end_xy_delta[0]);
+
             
             //cout << "before calling generate_poly_coefficients()" << endl;
-            vector<double> poly_coeffs = generate_poly_coefficients(start, end, additional_pts*TIME_DELTA);
-            //cout << "after calling generate_poly_coefficients()" << endl;
-            vector<double> next_s = generate_points_using_poly(poly_coeffs, additional_pts, TIME_DELTA);
-                        
-            **/
+            vector<double> startx(3), endx(3), starty(3), endy(3);
+            startx[0] = prev_x;
+            startx[1] = prev_speed * cos(prev_angle);
+            startx[2] = 0.; // should be centripetal based on curvature
+            endx[0] = end_xy[0];
+            endx[1] = TARGET_SPEED * cos(end_angle);
+            endx[2] = 0.;
+            vector<double> x_poly_coeffs = generate_poly_coefficients(startx, endx, additional_pts*TIME_DELTA);
 
+            starty[0] = prev_y;
+            starty[1] = prev_speed * sin(prev_angle);
+            starty[2] = 0.; // should be centripetal based on curvature
+            endy[0] = end_xy[1];
+            endy[1] = TARGET_SPEED * sin(end_angle);
+            endy[2] = 0.;
+            vector<double> y_poly_coeffs = generate_poly_coefficients(starty, endy, additional_pts*TIME_DELTA);
+
+            //cout << "after calling generate_poly_coefficients()" << endl;
+            vector<double> additional_x = generate_points_using_poly(x_poly_coeffs, additional_pts, TIME_DELTA);
+            vector<double> additional_y = generate_points_using_poly(y_poly_coeffs, additional_pts, TIME_DELTA);
+            
+            for(int i=0; i<additional_x.size(); i++) {
+              next_x_vals.push_back(additional_x[i]);
+              next_y_vals.push_back(additional_y[i]);       
+            }
+            */
+            
             vector<double> traj2 = get_lane_trajectory(
               start, additional_pts, TIME_DELTA, TARGET_SPEED, MAX_ACCL, MAX_JERK);
 
-          	// define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
-            double pos_x;
-            double pos_y;
-            double d = car_d; // Keep lane 
+          	
+            
             vector<vector<double>> tmp_xy;         
             for(int i=0; i<additional_pts; i++){
               //cout << "traj2[" << i << "] = " << traj2[i] << endl;
@@ -327,17 +356,16 @@ int main() {
             clean_normal_jerk(&prev_speed, &prev_acc, prev_angle, 
                               tmp_xy, prev_x, prev_y, 
                               TIME_DELTA, TARGET_SPEED, MAX_ACCL, MAX_JERK);
+            
 
             for(int i=0; i<tmp_xy.size(); i++) {
 
               next_x_vals.push_back(tmp_xy[i][0]);
               next_y_vals.push_back(tmp_xy[i][1]);       
             }
+            
            
-            /**
-            prev_speed = end[1];
-            prev_acc = end[2];
-            */
+            
 
             path_length_sent = next_x_vals.size();
 

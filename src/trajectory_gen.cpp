@@ -79,30 +79,23 @@ vector<double> get_end_vals(vector<double> start, int N, double dt,
 	double a = start[2];
 	for(int i=0; i<N; i++) {
 		x += v*dt;
+		v += a*dt;
 		//tmp.push_back(x);
 
-		// compute speed for next iteration
-		double v2 = v + a*dt;
-		v2 = getCeilVal(v2, max_speed);		
-
+		
 		// compute accleration for next iteration
 		double a2 = (max_speed - v) / dt;
 		if (abs(a2) > max_accl) {
-			a2 = getCeilVal(a2, max_accl);
-			v2 = v + a2*dt;
-			v2 = getCeilVal(v2, max_speed);
+			a2 = getCeilVal(a2, max_accl);			
 		}
 
 		double jerk = (a2 - a) / dt;
 		if (abs(jerk) > max_jerk) {
 			jerk = getCeilVal(jerk, max_jerk);		
 			a2 = a + jerk * dt;
-			a2 = getCeilVal(a2, max_accl);
-			v2 = v + a2*dt;	
-			v2 = getCeilVal(v2, max_speed);
+			a2 = getCeilVal(a2, max_accl);			
 		}
-		a = a2;		
-		v = v2;
+		a = a2;				
 	}
 
 
@@ -242,7 +235,7 @@ void clean_normal_jerk(double *last_pt_v, double *last_pt_a, double prev_angle,
 			cout << "corrected x, y: " << x << ", " << y << endl;
 			
 		}
-		**/
+		
 
 		
 		
@@ -262,6 +255,7 @@ void clean_normal_jerk(double *last_pt_v, double *last_pt_a, double prev_angle,
 			y = prev_y + s*sin(angle);
 			cout << "corrected x, y: " << x << ", " << y << endl;	
 		}
+		**/
 		
 		
 		
