@@ -28,7 +28,7 @@ vector<double> get_end_vals(vector<double> start, int N, double dt,
 Get the lane trajectory which meets all constraints
 Given; Initial values
 */
-vector<double> get_lane_trajectory( 
+vector<double> get_lane_trajectory( double *last_pt_v, double *last_pt_a,
 	vector<double> start, int N, double dt,
 	double max_speed, double max_accl, double max_jerk);
 
@@ -41,5 +41,8 @@ void clean_normal_jerk(double *last_pt_v, double *last_pt_a, double prev_angle,
 						double prev_x, double prev_y,
 						double dt, double max_speed, 
 						double max_accl, double max_jerk);
+
+void get_speed_accleration(double *last_pt_v, double *last_pt_a, 	
+	double dt, double max_speed, double max_accl, double max_jerk);
 
 #endif

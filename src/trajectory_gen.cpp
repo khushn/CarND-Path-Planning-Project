@@ -106,7 +106,8 @@ vector<double> get_end_vals(vector<double> start, int N, double dt,
 	return end;
 }
 
-vector<double> get_lane_trajectory( 
+vector<double> get_lane_trajectory(
+	double *last_pt_v, double *last_pt_a,
 	vector<double> start, int N, double dt, 
 	double max_speed, double max_accl, double max_jerk) {
 	vector<double> ret;
@@ -143,7 +144,9 @@ vector<double> get_lane_trajectory(
 		}
 		a = a2;		
 		//v = v2;
-	}	
+	}
+	*last_pt_v = v;
+	*last_pt_a = a;
 	return ret;
 }
 
@@ -276,4 +279,27 @@ void clean_normal_jerk(double *last_pt_v, double *last_pt_a, double prev_angle,
 	}
 	*last_pt_v = prev_speed;
 	*last_pt_a = prev_accl;
+}
+
+
+void get_speed_accleration(double *last_pt_v, double *last_pt_a, 	
+	double dt, double max_speed, double max_accl, double max_jerk) {
+
+	double prev_speed = *last_pt_v;
+	double prev_accl = *last_pt_a;
+
+	double accl = (max_speed - prev_speed) / dt;
+	if (abs(accl) > max_accl) {
+		accl = getCeilVal(accl, max_accl);
+	}
+
+	double jerk = (accl - prev_accl)/dt;
+	if (abs(jerk) > max_jerk) {
+		jerk = getCeilVal(jerk, max_jerk);
+		accl = prev_accl + jerk*dt;
+		accl = getCeilVal(accl, max_accl);
+	}	
+	*last_pt_v += accl * dt;
+	*last_pt_v = getCeilVal(*last_pt_v, max_speed);
+	*last_pt_a = accl;
 }

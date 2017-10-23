@@ -8,6 +8,7 @@
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
+#include "spline.h"
 #include "trajectory_gen.h"
 
 using namespace std;
@@ -166,6 +167,33 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 
 }
 
+/**
+We need to get the begin and s positions of the vector of s
+** to curve fit these ranges with x and y maps using spline 
+*/
+vector<int> getVectorPositions(double s_beg, double s_end, const vector<double> &maps_s) {
+  int beg = 0;
+
+  while(s_beg > maps_s[beg] && beg < maps_s.size()) {
+    beg++;
+  }
+
+  beg=max(0, beg-1);
+  int end = beg;
+  while(s_end > maps_s[end] && end < maps_s.size()) {
+    end++;
+  }
+
+  const int MIN_RANGE=6;
+  int range = end - beg + 1;
+  if (range < MIN_RANGE) {
+    int diff = MIN_RANGE - range;
+    beg = max(0, int(beg-diff/2));
+    end = min(int(maps_s.size())-1, int(end+diff/2));
+  }
+  return {beg, end};
+}
+
 int main() {
   uWS::Hub h;
 
@@ -202,6 +230,24 @@ int main() {
   	map_waypoints_dx.push_back(d_x);
   	map_waypoints_dy.push_back(d_y);
   }
+
+  /**
+  // Fit s, x points using spline
+  int lane = 1;
+  vector<double> x_for_lane;
+  vector<double> y_for_lane;
+  for(int i=0; i<map_waypoints_s.size(); i++) {
+    vector<double> tmp_xy = getXY(map_waypoints_s[i], lane*4.+2., map_waypoints_s, map_waypoints_x, map_waypoints_y);
+    x_for_lane.push_back(tmp_xy[0]);
+    y_for_lane.push_back(tmp_xy[1]);
+  }
+  tk::spline sx;  
+  sx.set_points(map_waypoints_s, x_for_lane);
+
+  // fit s, y points using spline
+  tk::spline sy;  
+  sy.set_points(map_waypoints_s, y_for_lane);
+  **/
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
@@ -242,7 +288,7 @@ int main() {
 
           	json msgJson;
 
-            const double TARGET_SPEED = 20.0;
+            const double TARGET_SPEED = 22.0;
             //const double TARGET_SPEED = 22.22; // 22 metres/ sec translates to 50 miles/hr
             const double MAX_ACCL = 10.0; // 10 metre/sec^2
             const double MAX_JERK = 10.0; // 10 metre/sec^3
@@ -274,13 +320,23 @@ int main() {
             double prev_angle=0.;
             vector<double> start(3);
             double d; // Keep lane 
-            if (prev_path_size == 0) {
+            vector<double> pts_x;
+            vector<double> pts_y;
+            if (prev_path_size < 2) {
               // first time 
               start[0] = car_s;
               prev_x = car_x;
               prev_y = car_y;
               prev_angle = deg2rad(car_yaw);
               d = car_d; // keep lane
+
+              double delta_prev_x = prev_x - cos(prev_angle);
+              pts_x.push_back(delta_prev_x);
+              pts_x.push_back(car_x);
+
+              double delta_prev_y = prev_y - sin(prev_angle);
+              pts_y.push_back(delta_prev_y);
+              pts_y.push_back(prev_y);
 
             } else {
               start[0] = end_path_s;
@@ -291,6 +347,12 @@ int main() {
               double pos_y2 = previous_path_y[prev_path_size-2];
               prev_angle = atan2(prev_y-pos_y2,prev_x-pos_x2);
               d = end_path_d;
+
+              pts_x.push_back(pos_x2);
+              pts_x.push_back(prev_x);
+
+              pts_y.push_back(pos_y2);
+              pts_y.push_back(prev_y);              
             }
            
             start[1] = prev_speed;
@@ -340,22 +402,87 @@ int main() {
             }
             */
             
-            vector<double> traj2 = get_lane_trajectory(
-              start, additional_pts, TIME_DELTA, TARGET_SPEED, MAX_ACCL, MAX_JERK);
+            //vector<double> traj2 = get_lane_trajectory(
+            //  &prev_speed, &prev_acc,
+            //  start, additional_pts, TIME_DELTA, TARGET_SPEED, MAX_ACCL, MAX_JERK);
 
-          	
             
+
+
+            // We add some more points at 30 metres separation 
+            // Logic is as instructed by this Udacity Path planning walkthrough video
+            // https://www.youtube.com/watch?time_continue=4&v=7sI3VHFPP0w
+            int lane = 1;
+            for(int i=0; i<3; i++) {
+                vector<double> tmp_xy = getXY(car_s + 30.*(i+1), 2.0 + 4.0 * lane, 
+                                              map_waypoints_s, map_waypoints_x, map_waypoints_y);
+                pts_x.push_back(tmp_xy[0]);
+                pts_y.push_back(tmp_xy[1]);
+            }
+
+
+            // Now shift those coordinates to car- coordinates
+            cout << "Conversion to car coordinates --> prev_angle: " << prev_angle << endl;
+            double refx = prev_x;
+            double refy = prev_y;
+            for(int i=0; i< pts_x.size(); i++) {
+              double tx = pts_x[i];
+              double ty = pts_y[i];
+              cout << "initial pts_x[i] = " << pts_x[i] << endl;
+              cout << "pts_y[i] = " << pts_y[i] << endl;
+              pts_x[i] = (tx - refx)*cos(prev_angle) + (ty - refy) * sin(prev_angle);
+              pts_y[i] = (ty - refy)*cos(prev_angle) - (tx - refx) * sin(prev_angle);
+              cout << "car pts_x[i] = " << pts_x[i] << endl;
+              cout << "pts_y[i] = " << pts_y[i] << endl;
+            }
+
+            // Using spline to fit shifted x, y points
+            tk::spline spl;            
+            spl.set_points(pts_x, pts_y);
+
+            // random ahead point
+            double point_x_ahead = 30.;
+            double point_y_ahead = spl(point_x_ahead);
+            double dist_ahead = sqrt(point_x_ahead*point_x_ahead + point_y_ahead*point_y_ahead);
+            // no. of steps it takes to get there at target speed
+
+            get_speed_accleration(&prev_speed, &prev_acc, TIME_DELTA, TARGET_SPEED, MAX_ACCL, MAX_JERK);
+
+            int steps = round (dist_ahead / (prev_speed * TIME_DELTA));
+
+            vector<double> trajx;  
+            vector<double> trajy;            
+            for(int i=0; i<additional_pts; i++) {
+              double tmpx = point_x_ahead*(i+1)/steps;
+              double tmpy = spl(tmpx);
+
+              // Shift them back to global coordinates              
+              next_x_vals.push_back(refx + tmpx*cos(prev_angle) - tmpy*sin(prev_angle));
+              next_y_vals.push_back(refy + tmpx*sin(prev_angle) + tmpy*cos(prev_angle));
+            }
+
+            /**
             vector<vector<double>> tmp_xy;         
             for(int i=0; i<additional_pts; i++){
               //cout << "traj2[" << i << "] = " << traj2[i] << endl;
-              vector<double> xy = getXY(traj2[i], d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+              //vector<double> xy = getXY(traj2[i], d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+              vector<double> xy(2);
+              double spx = sx(traj2[i]);
+              double spy = sy(traj2[i]);
+              cout << "spline value for sx: " << traj2[i] << "-->" << spx << endl;
+              xy[0] = spx;
+              cout << "spline value for sy: " << traj2[i] << "-->" << spy << endl;
+              xy[1] = spy;
               tmp_xy.push_back(xy);                  
             }
 
+            
             // Clean xy's for normal jerk                  
-            clean_normal_jerk(&prev_speed, &prev_acc, prev_angle, 
-                              tmp_xy, prev_x, prev_y, 
-                              TIME_DELTA, TARGET_SPEED, MAX_ACCL, MAX_JERK);
+            //clean_normal_jerk(&prev_speed, &prev_acc, prev_angle, 
+            //                  tmp_xy, prev_x, prev_y, 
+            //                  TIME_DELTA, TARGET_SPEED, MAX_ACCL, MAX_JERK);
+
+            
             
 
             for(int i=0; i<tmp_xy.size(); i++) {
@@ -363,6 +490,7 @@ int main() {
               next_x_vals.push_back(tmp_xy[i][0]);
               next_y_vals.push_back(tmp_xy[i][1]);       
             }
+            **/
             
            
             
