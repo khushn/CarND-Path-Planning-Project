@@ -249,7 +249,7 @@ int main() {
   sy.set_points(map_waypoints_s, y_for_lane);
   **/
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  h.onMessage([&max_s,&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -288,9 +288,9 @@ int main() {
 
           	json msgJson;
 
-            const double TARGET_SPEED = 22.0;
-            //const double TARGET_SPEED = 22.22; // 22 metres/ sec translates to 50 miles/hr
-            const double MAX_ACCL = 10.0; // 10 metre/sec^2
+            const double MAX_SPEED = 22.0;
+            //const double MAX_SPEED = 22.22; // 22 metres/ sec translates to 50 miles/hr
+            const double MAX_ACCL = 9.0; // 10 metre/sec^2
             const double MAX_JERK = 10.0; // 10 metre/sec^3
             const double TIME_DELTA = .020; // 20 milisec
             const int N = 50; // points into future
@@ -363,7 +363,7 @@ int main() {
             int additional_pts = N-prev_path_size;
             
             /*
-            vector<double> end = get_end_vals(start, additional_pts, TIME_DELTA, TARGET_SPEED, MAX_ACCL, MAX_JERK);
+            vector<double> end = get_end_vals(start, additional_pts, TIME_DELTA, MAX_SPEED, MAX_ACCL, MAX_JERK);
             cout << "end vector: " << end[0] << ", " << end[1] << ", " << end[2] << endl;
 
 
@@ -380,7 +380,7 @@ int main() {
             startx[1] = prev_speed * cos(prev_angle);
             startx[2] = 0.; // should be centripetal based on curvature
             endx[0] = end_xy[0];
-            endx[1] = TARGET_SPEED * cos(end_angle);
+            endx[1] = MAX_SPEED * cos(end_angle);
             endx[2] = 0.;
             vector<double> x_poly_coeffs = generate_poly_coefficients(startx, endx, additional_pts*TIME_DELTA);
 
@@ -388,7 +388,7 @@ int main() {
             starty[1] = prev_speed * sin(prev_angle);
             starty[2] = 0.; // should be centripetal based on curvature
             endy[0] = end_xy[1];
-            endy[1] = TARGET_SPEED * sin(end_angle);
+            endy[1] = MAX_SPEED * sin(end_angle);
             endy[2] = 0.;
             vector<double> y_poly_coeffs = generate_poly_coefficients(starty, endy, additional_pts*TIME_DELTA);
 
@@ -404,8 +404,41 @@ int main() {
             
             //vector<double> traj2 = get_lane_trajectory(
             //  &prev_speed, &prev_acc,
-            //  start, additional_pts, TIME_DELTA, TARGET_SPEED, MAX_ACCL, MAX_JERK);
+            //  start, additional_pts, TIME_DELTA, MAX_SPEED, MAX_ACCL, MAX_JERK);
 
+            // Sensor fusion data
+            double mycar_target_speed = MAX_SPEED;
+            const double CAR_AHEAD_RANGE = 100.0;
+            cout << "Sensor fusion data" << endl;
+            for(int i=0; i<sensor_fusion.size(); i++) {
+              //cout << "[" << i << "]" << sensor_fusion[i] << endl;
+              int ocar_id = sensor_fusion[i][0];
+              double ocar_x = sensor_fusion[i][1]; 
+              double ocar_y = sensor_fusion[i][2]; 
+              double ocar_vx = sensor_fusion[i][3]; 
+              double ocar_vy = sensor_fusion[i][4]; 
+              double ocar_s = sensor_fusion[i][5]; 
+              double ocar_d = sensor_fusion[i][6]; 
+
+              // check of other car is ahead of mine by 100 meters (enough time to respomd)
+              double ds = ocar_s - start[0];
+              if (ds < 0 && abs(ds) > max_s/2) {
+                // cyclic track
+                ds = max_s +ds;
+              }
+
+
+              if (ds > 0 && ds < CAR_AHEAD_RANGE && get_lane_from_d(ocar_d) == get_lane_from_d(d) )  {
+                cout << "car ahead in same lane: [" << i << "]" << sensor_fusion[i] << endl;
+                cout << "distance ahead: " << ds << endl;
+                double ocar_speed = sqrt(ocar_vx*ocar_vx + ocar_vy*ocar_vy);
+                cout << "car ahead speed: " << ocar_speed << endl;
+                mycar_target_speed = min(ocar_speed, MAX_SPEED);
+              }
+
+            }
+            
+           
             
 
 
@@ -414,7 +447,7 @@ int main() {
             // https://www.youtube.com/watch?time_continue=4&v=7sI3VHFPP0w
             int lane = 1;
             for(int i=0; i<3; i++) {
-                vector<double> tmp_xy = getXY(car_s + 30.*(i+1), 2.0 + 4.0 * lane, 
+                vector<double> tmp_xy = getXY(start[0] + 30.*(i+1), 2.0 + 4.0 * lane, 
                                               map_waypoints_s, map_waypoints_x, map_waypoints_y);
                 pts_x.push_back(tmp_xy[0]);
                 pts_y.push_back(tmp_xy[1]);
@@ -446,14 +479,22 @@ int main() {
             double dist_ahead = sqrt(point_x_ahead*point_x_ahead + point_y_ahead*point_y_ahead);
             // no. of steps it takes to get there at target speed
 
-            get_speed_accleration(&prev_speed, &prev_acc, TIME_DELTA, TARGET_SPEED, MAX_ACCL, MAX_JERK);
+            //get_speed_accleration(&prev_speed, &prev_acc, TIME_DELTA, mycar_target_speed, MAX_ACCL, MAX_JERK);
+            vector<double> dist_fractions = get_distance_fractions(&prev_speed, &prev_acc, 
+                                                dist_ahead, additional_pts, TIME_DELTA, 
+                                                mycar_target_speed, 
+                                                MAX_SPEED, MAX_ACCL, MAX_JERK);
 
-            int steps = round (dist_ahead / (prev_speed * TIME_DELTA));
+            // We do this absolute check any way, as some times car was seen to go 
+            // marginally over speed limit
+            prev_speed = min(prev_speed, MAX_SPEED);
+            //int steps = round (dist_ahead / (prev_speed * TIME_DELTA));
 
             vector<double> trajx;  
             vector<double> trajy;            
-            for(int i=0; i<additional_pts; i++) {
-              double tmpx = point_x_ahead*(i+1)/steps;
+            for(int i=0; i<dist_fractions.size(); i++) {
+              // double tmpx = point_x_ahead*(i+1)/steps;
+              double tmpx = point_x_ahead*dist_fractions[i];
               double tmpy = spl(tmpx);
 
               // Shift them back to global coordinates              
@@ -480,7 +521,7 @@ int main() {
             // Clean xy's for normal jerk                  
             //clean_normal_jerk(&prev_speed, &prev_acc, prev_angle, 
             //                  tmp_xy, prev_x, prev_y, 
-            //                  TIME_DELTA, TARGET_SPEED, MAX_ACCL, MAX_JERK);
+            //                  TIME_DELTA, MAX_SPEED, MAX_ACCL, MAX_JERK);
 
             
             
@@ -491,9 +532,6 @@ int main() {
               next_y_vals.push_back(tmp_xy[i][1]);       
             }
             **/
-            
-           
-            
 
             path_length_sent = next_x_vals.size();
 

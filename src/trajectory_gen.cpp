@@ -9,6 +9,8 @@
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
 
+// needed to be added for floating point comparison
+const float SMALL_VAL = .001; 
 /**
 Implementation notes: 
 See Udacity SDCND Term 3, Lesson 5, Implement Quintic Polynomial Solver C++
@@ -172,15 +174,14 @@ void clean_normal_jerk(double *last_pt_v, double *last_pt_a, double prev_angle,
 		double jerk = (accl - prev_accl) / dt;
 
 		bool recompute=false;
-		float small_val = .0000001; // needed to be added for floating point comparison
-		if (abs(v) > max_speed + small_val) {
+		if (abs(v) > max_speed + SMALL_VAL) {
 			cout << "VIOLATION -- speed " << v << endl;
 			v = getCeilVal(v, max_speed);
 			recompute = true;
 		}
 
 		
-		if (abs(accl) > max_accl + small_val) {
+		if (abs(accl) > max_accl + SMALL_VAL) {
 			cout << "VIOLATION -- accl " << accl << endl;
 			accl = getCeilVal(accl, max_accl);
 			v = prev_speed + accl * dt;
@@ -188,7 +189,7 @@ void clean_normal_jerk(double *last_pt_v, double *last_pt_a, double prev_angle,
 		}
 
 		
-		if ( abs(jerk) > max_jerk + small_val) {
+		if ( abs(jerk) > max_jerk + SMALL_VAL) {
 			cout << "VIOLATION -- jerk " << jerk << endl;
 			jerk = getCeilVal(jerk, max_jerk);
 			accl = prev_accl + jerk * dt;
@@ -220,7 +221,7 @@ void clean_normal_jerk(double *last_pt_v, double *last_pt_a, double prev_angle,
 
 		/**
 		//cout << "normal_vel: " << normal_vel << endl;
-		if (abs(normal_vel) > max_accl + small_val) {
+		if (abs(normal_vel) > max_accl + SMALL_VAL) {
 			cout << "VIOLATION -- normal accl exceeded limit " << normal_vel << endl;
 			cout << "prev_angle: " << prev_angle << ". angle: " << angle << endl;
 			
@@ -244,7 +245,7 @@ void clean_normal_jerk(double *last_pt_v, double *last_pt_a, double prev_angle,
 		
 		// check for normal jerk
 		double normal_jerk = normal_vel / dt;
-		if (abs(normal_jerk) > max_jerk + small_val) {
+		if (abs(normal_jerk) > max_jerk + SMALL_VAL) {
 			cout << "VIOLATION -- normal jerk exceeded limit " << normal_jerk << endl;
 			normal_jerk = getCeilVal(normal_jerk, max_jerk);
 			normal_vel = normal_jerk * dt;
@@ -285,21 +286,75 @@ void clean_normal_jerk(double *last_pt_v, double *last_pt_a, double prev_angle,
 void get_speed_accleration(double *last_pt_v, double *last_pt_a, 	
 	double dt, double max_speed, double max_accl, double max_jerk) {
 
+	
 	double prev_speed = *last_pt_v;
 	double prev_accl = *last_pt_a;
 
 	double accl = (max_speed - prev_speed) / dt;
-	if (abs(accl) > max_accl) {
+	if (abs(accl) > max_accl - SMALL_VAL) {
 		accl = getCeilVal(accl, max_accl);
 	}
 
 	double jerk = (accl - prev_accl)/dt;
-	if (abs(jerk) > max_jerk) {
+	if (abs(jerk) > max_jerk - SMALL_VAL) {
 		jerk = getCeilVal(jerk, max_jerk);
 		accl = prev_accl + jerk*dt;
 		accl = getCeilVal(accl, max_accl);
 	}	
-	*last_pt_v += accl * dt;
-	*last_pt_v = getCeilVal(*last_pt_v, max_speed);
+	*last_pt_v += accl * dt;	
 	*last_pt_a = accl;
+}
+
+int get_lane_from_d(double d) {
+	if (d < 4.0) {
+		return 0;
+	} else if(d<8.0) {
+		return 1;
+	} else if(d<12.0) {
+		return 2;
+	} else {
+		return -1;
+	}
+}
+
+vector<double> get_distance_fractions(double *last_pt_v, double *last_pt_a, 	
+	double dist, double N, double dt,  double target_speed, 
+	double max_speed, double max_accl, double max_jerk) {
+	
+	vector<double> dist_fractions;
+	double prev_speed = *last_pt_v;
+	double prev_accl = *last_pt_a;
+
+	double rem_dist = dist;
+	int count=0;
+	double dist_covered=0.;
+	while (rem_dist > 0. && count < N) {
+		dist_covered += prev_speed * dt;
+		dist_fractions.push_back(dist_covered/dist);
+		rem_dist-=dist_covered;
+
+		double accl = (target_speed - prev_speed) / dt;
+		if (abs(accl) > max_accl - SMALL_VAL) {
+			accl = getCeilVal(accl, max_accl);
+		}
+
+		double jerk = (accl - prev_accl)/dt;
+		if (abs(jerk) > max_jerk - SMALL_VAL) {
+			jerk = getCeilVal(jerk, max_jerk);
+			accl = prev_accl + jerk*dt;
+			accl = getCeilVal(accl, max_accl);
+		}
+		prev_accl = accl;
+		double speed =  prev_speed + accl*dt;
+		if (speed > max_speed) {
+			speed = getCeilVal(speed, max_speed);
+			accl = (speed - prev_speed) / dt;
+		}
+		prev_speed = speed;
+		prev_accl = accl;
+		count++;
+	}
+	*last_pt_v = prev_speed;	
+	*last_pt_a = prev_accl;	
+	return dist_fractions;
 }

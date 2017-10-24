@@ -45,4 +45,13 @@ void clean_normal_jerk(double *last_pt_v, double *last_pt_a, double prev_angle,
 void get_speed_accleration(double *last_pt_v, double *last_pt_a, 	
 	double dt, double max_speed, double max_accl, double max_jerk);
 
+int get_lane_from_d(double d);
+
+/**
+get the list of distance fractions covereed in each time unit dt
+*/
+vector<double> get_distance_fractions(double *last_pt_v, double *last_pt_a, 	
+	double dist, double N, double dt, double target_speed, 
+	double max_speed, double max_accl, double max_jerk);
+
 #endif
