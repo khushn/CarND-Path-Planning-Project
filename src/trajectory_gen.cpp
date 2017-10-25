@@ -52,6 +52,46 @@ vector<double> generate_points_using_poly(vector<double> coeffs, int N, double t
 	return vals;
 }
 
+vector<double> get_lane_change_poly(int from_lane, int to_lane, double dt, double time_limit) {
+	vector<double> start(3), end(3);
+	start[0] = 2.0 + 4.0 * from_lane;
+	end[0] = 2.0 + 4.0 * to_lane;
+	start[1]=start[2]=end[1]=end[2] = 0.;
+	vector<double> poly_coeffs = generate_poly_coefficients(start, end, time_limit);
+	int n = (int)time_limit/dt;
+	vector<double> ret = generate_points_using_poly(poly_coeffs, n, dt);
+	return ret;
+}
+
+bool can_change_lane_to(vector<vector<double>> cars_in_lane, double my_speed, double car_ahead_speed, 
+	double cur_s, double time_limit, int prev_path_size, double dt) {
+
+	double end_pos = cur_s + my_speed * time_limit;
+	for(int i=0; i<cars_in_lane.size(); i++) {
+		double vx = cars_in_lane[i][3];
+		double vy = cars_in_lane[i][4];
+		double car_speed = sqrt(vx*vx + vy*vy);
+		double car_s = cars_in_lane[i][5];
+
+		// we should add the offset to car's position, because we plan for ego into the future, 
+		// at the end of the path
+		car_s += car_speed * prev_path_size * dt;
+		// check if other car is ahead and not moving slow than my car ahead
+		if (car_s > cur_s && car_speed < car_ahead_speed)
+			return false;
+
+		// if car's present position is close to mine, then don't cnange
+		if (car_s > cur_s - 5 && car_s < cur_s+5)
+			return false;
+
+		double car_future_s = car_s + car_speed * time_limit;
+		if (car_future_s > end_pos - 5 && car_future_s < end_pos + 5) {
+			return false;
+		}
+	}
+	return true;
+}
+
 double getCeilVal(double val, double max) {
 	if (abs(val) > max) {
 		int sign = 1;
@@ -318,20 +358,20 @@ int get_lane_from_d(double d) {
 }
 
 vector<double> get_distance_fractions(double *last_pt_v, double *last_pt_a, 	
-	double dist, double N, double dt,  double target_speed, 
+	double dist, int N, double dt,  double target_speed, 
 	double max_speed, double max_accl, double max_jerk) {
 	
 	vector<double> dist_fractions;
 	double prev_speed = *last_pt_v;
 	double prev_accl = *last_pt_a;
 
-	double rem_dist = dist;
+	//double rem_dist = dist;
 	int count=0;
 	double dist_covered=0.;
-	while (rem_dist > 0. && count < N) {
+	while (dist_covered < dist && count < N) {
 		dist_covered += prev_speed * dt;
 		dist_fractions.push_back(dist_covered/dist);
-		rem_dist-=dist_covered;
+		//rem_dist-=dist_covered;
 
 		double accl = (target_speed - prev_speed) / dt;
 		if (abs(accl) > max_accl - SMALL_VAL) {

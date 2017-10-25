@@ -361,6 +361,12 @@ int main() {
             cout << "start vector: " << start[0] << ", " << start[1] << ", " << start[2] << endl;
 
             int additional_pts = N-prev_path_size;
+
+            if (additional_pts <=0) {
+              // this situation typically happens when we are changing lanes 
+              // and our previous array is well over 50!
+              additional_pts=1;
+            }
             
             /*
             vector<double> end = get_end_vals(start, additional_pts, TIME_DELTA, MAX_SPEED, MAX_ACCL, MAX_JERK);
@@ -408,8 +414,16 @@ int main() {
 
             // Sensor fusion data
             double mycar_target_speed = MAX_SPEED;
-            const double CAR_AHEAD_RANGE = 100.0;
+            const double CAR_AHEAD_RANGE = MAX_SPEED * 1;
+            const double CAR_BEHIND_RANGE = -MAX_SPEED *1;
+            
             cout << "Sensor fusion data" << endl;
+            vector<vector<double>> lane_cars;          
+            vector<vector<double>> left_lane_cars;
+            vector<vector<double>> right_lane_cars;
+            double closest_car_ahead_dist=-1.;
+            vector<double> car_ahead;
+            double car_ahead_speed=0.;
             for(int i=0; i<sensor_fusion.size(); i++) {
               //cout << "[" << i << "]" << sensor_fusion[i] << endl;
               int ocar_id = sensor_fusion[i][0];
@@ -428,31 +442,120 @@ int main() {
               }
 
 
-              if (ds > 0 && ds < CAR_AHEAD_RANGE && get_lane_from_d(ocar_d) == get_lane_from_d(d) )  {
-                cout << "car ahead in same lane: [" << i << "]" << sensor_fusion[i] << endl;
-                cout << "distance ahead: " << ds << endl;
-                double ocar_speed = sqrt(ocar_vx*ocar_vx + ocar_vy*ocar_vy);
-                cout << "car ahead speed: " << ocar_speed << endl;
-                mycar_target_speed = min(ocar_speed, MAX_SPEED);
+              if (ds > CAR_BEHIND_RANGE && ds < CAR_AHEAD_RANGE )  {
+                int other_car_lane = get_lane_from_d(ocar_d);
+                int my_car_lane = get_lane_from_d(d);
+                if ( other_car_lane == my_car_lane && ds > 0) {
+                  lane_cars.push_back(sensor_fusion[i]);
+                  if (closest_car_ahead_dist < 0 || closest_car_ahead_dist > ds) {
+                    closest_car_ahead_dist = ds;
+                    car_ahead.clear();
+                    for(int j=0; j<sensor_fusion[i].size(); j++)
+                      car_ahead.push_back(sensor_fusion[i][j]);
+                    car_ahead_speed = sqrt(ocar_vx*ocar_vx + ocar_vy*ocar_vy);
+                  }
+
+                } else if (other_car_lane + 1 == my_car_lane) {
+                  left_lane_cars.push_back(sensor_fusion[i]);                  
+                } else if (other_car_lane -1 == my_car_lane) {
+                  right_lane_cars.push_back(sensor_fusion[i]);
+                }
+              }
+            } // end for
+
+            cout << "No. of cars in lane: " << lane_cars.size() << endl;
+            cout << "No. of cars in left lane: " << left_lane_cars.size() << endl;
+            cout << "No. of cars in right lane: " << right_lane_cars.size() << endl;
+
+            int lane = get_lane_from_d(d);
+            bool lane_change=false;            
+            if(closest_car_ahead_dist > 0) {
+                cout << "car ahead in same lane, id: " << car_ahead[0] << endl;
+                cout << "distance ahead: " << closest_car_ahead_dist << endl;
+                cout << "car ahead speed: " << car_ahead_speed << endl;
+               
+                // mark for lane change 
+                if (prev_speed < car_ahead_speed) {
+                  lane_change=true;
+                }
+            }
+
+            cout << "lane_change: " << lane_change << endl;
+           
+            int target_lane=-1;
+            const double LANE_CHANGE_TIME_LIM=3.; // seconds
+            vector<double> lane_change_poly;
+            if(lane_change) {
+
+              bool target_lane_found=false;
+              if (lane >=1) {
+                // check first, if left lane change possible
+                target_lane_found = can_change_lane_to(left_lane_cars, prev_speed, car_ahead_speed, 
+                                      start[0], LANE_CHANGE_TIME_LIM, 
+                                      prev_path_size, TIME_DELTA);
+                if(target_lane_found)
+                  target_lane = lane-1;
               }
 
-            }
-            
-           
-            
+              if (!target_lane_found && lane <=1) {
+                // Now check for the lane change to right lane
+                target_lane_found = can_change_lane_to(right_lane_cars, prev_speed, car_ahead_speed, 
+                                      start[0], LANE_CHANGE_TIME_LIM,
+                                      prev_path_size, TIME_DELTA);
+                if(target_lane_found)
+                  target_lane = lane+1;
+              }
+
+              lane_change_poly = get_lane_change_poly(lane, target_lane, 
+                                      TIME_DELTA, LANE_CHANGE_TIME_LIM);
+
+              cout << "target lane: " << target_lane << "\nlane change poly: ";
+              for(int i=0; i< lane_change_poly.size(); i++)
+                cout << lane_change_poly[i] << " ";
+              cout << endl;
+              cout << "lane_change_poly.size(): " << lane_change_poly.size() << endl;
+            } 
 
 
-            // We add some more points at 30 metres separation 
-            // Logic is as instructed by this Udacity Path planning walkthrough video
-            // https://www.youtube.com/watch?time_continue=4&v=7sI3VHFPP0w
-            int lane = 1;
-            for(int i=0; i<3; i++) {
-                vector<double> tmp_xy = getXY(start[0] + 30.*(i+1), 2.0 + 4.0 * lane, 
+            if (lane_change && target_lane>=0) {
+              for(int i=4; i<lane_change_poly.size(); i+=5) {
+                // we don't need to add every point, because if may cause problem with 
+                // spline fitting if values of x are not in increasing order
+                double new_s_pos = start[0] + prev_speed*TIME_DELTA*(i);
+                vector<double> tmp_xy = getXY(new_s_pos, lane_change_poly[i], 
+                                                map_waypoints_s, map_waypoints_x, map_waypoints_y);
+                pts_x.push_back(tmp_xy[0]);
+                pts_y.push_back(tmp_xy[1]);
+               
+              }              
+
+              // Also add two more points in the new lane
+              double last_x = pts_x[pts_x.size()-1];
+              for(int i=0; i<2; i++) {
+                vector<double> tmp_xy = getXY(last_x + 10.*(i+1), 2.0 + 4.0 * target_lane, 
                                               map_waypoints_s, map_waypoints_x, map_waypoints_y);
                 pts_x.push_back(tmp_xy[0]);
                 pts_y.push_back(tmp_xy[1]);
-            }
+              }
 
+            } else {
+              // Scenario of maintaining the same lane -- "KL"
+              // We add some more points at 30 metres separation 
+              // Logic is as instructed by this Udacity Path planning walkthrough video
+              // https://www.youtube.com/watch?time_continue=4&v=7sI3VHFPP0w
+              
+              if (closest_car_ahead_dist > 0 ) {
+                 mycar_target_speed = min(car_ahead_speed, MAX_SPEED);
+              }
+
+              for(int i=0; i<3; i++) {
+                  vector<double> tmp_xy = getXY(start[0] + 30.*(i+1), 2.0 + 4.0 * lane, 
+                                                map_waypoints_s, map_waypoints_x, map_waypoints_y);
+                  pts_x.push_back(tmp_xy[0]);
+                  pts_y.push_back(tmp_xy[1]);
+              }
+            }
+            
 
             // Now shift those coordinates to car- coordinates
             cout << "Conversion to car coordinates --> prev_angle: " << prev_angle << endl;
@@ -461,30 +564,50 @@ int main() {
             for(int i=0; i< pts_x.size(); i++) {
               double tx = pts_x[i];
               double ty = pts_y[i];
-              cout << "initial pts_x[i] = " << pts_x[i] << endl;
-              cout << "pts_y[i] = " << pts_y[i] << endl;
-              pts_x[i] = (tx - refx)*cos(prev_angle) + (ty - refy) * sin(prev_angle);
+              //cout << "initial pts_x[i] = " << pts_x[i] << endl;
+              //cout << "pts_y[i] = " << pts_y[i] << endl;
+              double cur_x_pt = (tx - refx)*cos(prev_angle) + (ty - refy) * sin(prev_angle);
+              if (i >= 1 && cur_x_pt < pts_x[i-1]) {
+                // Spline needs only increasing values of x, 
+                // if points are too close, so erroneously a farther one is less, 
+                //just ignore it
+                continue;
+              }
+              pts_x[i] = cur_x_pt;
               pts_y[i] = (ty - refy)*cos(prev_angle) - (tx - refx) * sin(prev_angle);
-              cout << "car pts_x[i] = " << pts_x[i] << endl;
-              cout << "pts_y[i] = " << pts_y[i] << endl;
+              //cout << "car pts_x[i] = " << pts_x[i] << endl;
+              //cout << "pts_y[i] = " << pts_y[i] << endl;
             }
 
             // Using spline to fit shifted x, y points
             tk::spline spl;            
             spl.set_points(pts_x, pts_y);
 
-            // random ahead point
-            double point_x_ahead = 30.;
-            double point_y_ahead = spl(point_x_ahead);
-            double dist_ahead = sqrt(point_x_ahead*point_x_ahead + point_y_ahead*point_y_ahead);
+            double point_x_ahead;
             // no. of steps it takes to get there at target speed
 
+            if (lane_change && target_lane>=0) {
+              // should add about 125 new points, but its okay, I guess!!
+              additional_pts = LANE_CHANGE_TIME_LIM / TIME_DELTA + 20;
+              point_x_ahead = LANE_CHANGE_TIME_LIM * prev_speed * 2;             
+            } else {
+              // random ahead point
+              point_x_ahead = 30.;
+              
+            }
+
+            double point_y_ahead = spl(point_x_ahead);
+            double dist_ahead = sqrt(point_x_ahead*point_x_ahead + point_y_ahead*point_y_ahead);
+
+            cout << "Need to add " << additional_pts << " additional points" << endl;
+            cout << "dist_ahead: " << dist_ahead << endl;
             //get_speed_accleration(&prev_speed, &prev_acc, TIME_DELTA, mycar_target_speed, MAX_ACCL, MAX_JERK);
             vector<double> dist_fractions = get_distance_fractions(&prev_speed, &prev_acc, 
                                                 dist_ahead, additional_pts, TIME_DELTA, 
                                                 mycar_target_speed, 
                                                 MAX_SPEED, MAX_ACCL, MAX_JERK);
 
+            cout << "No. of dist fractions to add: " << dist_fractions.size() << endl;
             // We do this absolute check any way, as some times car was seen to go 
             // marginally over speed limit
             prev_speed = min(prev_speed, MAX_SPEED);
@@ -534,6 +657,7 @@ int main() {
             **/
 
             path_length_sent = next_x_vals.size();
+            cout << "path_length_sent: " << path_length_sent << endl;
 
           	msgJson["next_x"] = next_x_vals;
           	msgJson["next_y"] = next_y_vals;

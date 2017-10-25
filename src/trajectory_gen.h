@@ -18,6 +18,19 @@ vector<double> generate_points_using_poly(vector<double> coeffs, int N,  double 
 
 
 /**
+Given a lane changee requirement generate the poly of 'd' for it
+**/
+vector<double> get_lane_change_poly(int from_lane, int to_lane, double dt, double time_limit);
+
+/**
+Can we change lanes to a given lane. 
+Check for future positions of cars in that lane, and see if there is a clash. 
+Return false early, if there is
+**/
+bool can_change_lane_to(vector<vector<double>> cars_in_lane, double my_speed, double car_ahead_speed, 
+												double cur_s, double time_limit, 
+												int prev_path_size, double dt);
+/**
 Get the end target distance, speed and acceleration. 
 Given; Initial values
 */
@@ -51,7 +64,8 @@ int get_lane_from_d(double d);
 get the list of distance fractions covereed in each time unit dt
 */
 vector<double> get_distance_fractions(double *last_pt_v, double *last_pt_a, 	
-	double dist, double N, double dt, double target_speed, 
+	double dist, int N, double dt, double target_speed, 
 	double max_speed, double max_accl, double max_jerk);
+
 
 #endif
