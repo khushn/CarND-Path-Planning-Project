@@ -63,14 +63,17 @@ vector<double> get_lane_change_poly(int from_lane, int to_lane, double dt, doubl
 	return ret;
 }
 
-bool can_change_lane_to(vector<vector<double>> cars_in_lane, double my_speed, double car_ahead_speed, 
+double cost_of_changing_lane_to(vector<vector<double>> cars_in_lane, double my_speed, double car_ahead_speed, 
 	double cur_s, double time_limit, int prev_path_size, double dt) {
 
 	double end_pos = cur_s + my_speed * time_limit;
-	for(int i=0; i<cars_in_lane.size(); i++) {
+	int num_cars = cars_in_lane.size();
+	double avg_speed=0.;
+	for(int i=0; i<num_cars; i++) {
 		double vx = cars_in_lane[i][3];
 		double vy = cars_in_lane[i][4];
 		double car_speed = sqrt(vx*vx + vy*vy);
+		avg_speed += car_speed;
 		double car_s = cars_in_lane[i][5];
 
 		// we should add the offset to car's position, because we plan for ego into the future, 
@@ -78,18 +81,32 @@ bool can_change_lane_to(vector<vector<double>> cars_in_lane, double my_speed, do
 		car_s += car_speed * prev_path_size * dt;
 		// check if other car is ahead and not moving slow than my car ahead
 		if (car_s > cur_s && car_speed < car_ahead_speed)
-			return false;
+			return -1;
 
 		// if car's present position is close to mine, then don't cnange
 		if (car_s > cur_s - 5 && car_s < cur_s+5)
-			return false;
+			return -1;
 
 		double car_future_s = car_s + car_speed * time_limit;
 		if (car_future_s > end_pos - 5 && car_future_s < end_pos + 5) {
-			return false;
+			return -1;
 		}
 	}
-	return true;
+
+	// lane changing possible, but evaluate cost
+	double cost = 0.;
+	// no. of cars in lane, the less the better
+	cost += num_cars * 20; 
+
+	// cost based on average speed of the cars in the lane
+	if (num_cars>0) {
+		avg_speed /= num_cars;
+	} else {
+		avg_speed = my_speed;
+	}
+	cost += (my_speed - avg_speed) * 10;
+
+	return cost;
 }
 
 double getCeilVal(double val, double max) {

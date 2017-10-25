@@ -290,7 +290,7 @@ int main() {
 
             const double MAX_SPEED = 22.0;
             //const double MAX_SPEED = 22.22; // 22 metres/ sec translates to 50 miles/hr
-            const double MAX_ACCL = 9.0; // 10 metre/sec^2
+            const double MAX_ACCL = 6.0; // 10 metre/sec^2
             const double MAX_JERK = 10.0; // 10 metre/sec^3
             const double TIME_DELTA = .020; // 20 milisec
             const int N = 50; // points into future
@@ -435,6 +435,10 @@ int main() {
               double ocar_d = sensor_fusion[i][6]; 
 
               // check of other car is ahead of mine by 100 meters (enough time to respomd)
+              // we also need to project the car into the future
+              // basically corresponding to the time at the end of prev path
+              double ocar_speed = sqrt(ocar_vx*ocar_vx + ocar_vy*ocar_vy);
+              ocar_s += ocar_speed * prev_path_size * TIME_DELTA;
               double ds = ocar_s - start[0];
               if (ds < 0 && abs(ds) > max_s/2) {
                 // cyclic track
@@ -445,16 +449,17 @@ int main() {
               if (ds > CAR_BEHIND_RANGE && ds < CAR_AHEAD_RANGE )  {
                 int other_car_lane = get_lane_from_d(ocar_d);
                 int my_car_lane = get_lane_from_d(d);
-                if ( other_car_lane == my_car_lane && ds > 0) {
-                  lane_cars.push_back(sensor_fusion[i]);
+                if ( other_car_lane == my_car_lane && ds >= 0) {
+                  
                   if (closest_car_ahead_dist < 0 || closest_car_ahead_dist > ds) {
                     closest_car_ahead_dist = ds;
                     car_ahead.clear();
                     for(int j=0; j<sensor_fusion[i].size(); j++)
                       car_ahead.push_back(sensor_fusion[i][j]);
-                    car_ahead_speed = sqrt(ocar_vx*ocar_vx + ocar_vy*ocar_vy);
+                    car_ahead_speed = ocar_speed;
                   }
 
+                  lane_cars.push_back(sensor_fusion[i]);
                 } else if (other_car_lane + 1 == my_car_lane) {
                   left_lane_cars.push_back(sensor_fusion[i]);                  
                 } else if (other_car_lane -1 == my_car_lane) {
@@ -487,25 +492,43 @@ int main() {
             vector<double> lane_change_poly;
             if(lane_change) {
 
-              bool target_lane_found=false;
+              //bool target_lane_found=false;
+              double cost_left_lane=-1.0;
+              double cost_right_lane=-1.0;
               if (lane >=1) {
                 // check first, if left lane change possible
-                target_lane_found = can_change_lane_to(left_lane_cars, prev_speed, car_ahead_speed, 
+                cost_left_lane = cost_of_changing_lane_to(left_lane_cars, prev_speed, car_ahead_speed, 
                                       start[0], LANE_CHANGE_TIME_LIM, 
-                                      prev_path_size, TIME_DELTA);
-                if(target_lane_found)
-                  target_lane = lane-1;
+                                      prev_path_size, TIME_DELTA);    
+                cout << "cost_left_lane change: " << cost_left_lane << endl;            
               }
 
-              if (!target_lane_found && lane <=1) {
+              if (lane <=1) {
                 // Now check for the lane change to right lane
-                target_lane_found = can_change_lane_to(right_lane_cars, prev_speed, car_ahead_speed, 
+                cost_right_lane = cost_of_changing_lane_to(right_lane_cars, prev_speed, car_ahead_speed, 
                                       start[0], LANE_CHANGE_TIME_LIM,
-                                      prev_path_size, TIME_DELTA);
-                if(target_lane_found)
-                  target_lane = lane+1;
+                                      prev_path_size, TIME_DELTA); 
+                cout << "cost_right_lane change: " << cost_right_lane << endl;            
               }
 
+              int left_lane = lane-1;
+              int right_lane = lane+1;
+              if (cost_left_lane >=0 || cost_right_lane >=0) {
+                // at least we can change to some lane
+                if (cost_left_lane >= 0 &&  cost_right_lane >=0) {
+                  if( cost_left_lane <= cost_right_lane) {
+                    target_lane = left_lane;
+                  } else {
+                    target_lane = right_lane;
+                  }
+                } else if (cost_left_lane >=0) {
+                  target_lane = left_lane;
+                } else {
+                  target_lane = right_lane;
+                }
+              }
+
+              /**
               lane_change_poly = get_lane_change_poly(lane, target_lane, 
                                       TIME_DELTA, LANE_CHANGE_TIME_LIM);
 
@@ -514,9 +537,11 @@ int main() {
                 cout << lane_change_poly[i] << " ";
               cout << endl;
               cout << "lane_change_poly.size(): " << lane_change_poly.size() << endl;
+              **/
             } 
 
 
+            /*
             if (lane_change && target_lane>=0) {
               for(int i=4; i<lane_change_poly.size(); i+=5) {
                 // we don't need to add every point, because if may cause problem with 
@@ -549,12 +574,39 @@ int main() {
               }
 
               for(int i=0; i<3; i++) {
-                  vector<double> tmp_xy = getXY(start[0] + 30.*(i+1), 2.0 + 4.0 * lane, 
+                  vector<double> tmp_xy = getXY(start[0] + BUFFER_DIST*(i+1), 2.0 + 4.0 * lane, 
                                                 map_waypoints_s, map_waypoints_x, map_waypoints_y);
                   pts_x.push_back(tmp_xy[0]);
                   pts_y.push_back(tmp_xy[1]);
               }
             }
+            */
+
+            // was 30 in the intsuctor video
+            const double BUFFER_DIST = 30.; 
+
+            if ( lane_change && target_lane >=0 ) {
+              cout << "Changing lanes to: " << target_lane << endl;
+              lane = target_lane;
+
+              // We generate some more points, to ensure 
+              // lane change is not abandoned mid way
+              additional_pts = (int) (BUFFER_DIST / (prev_speed * TIME_DELTA));
+            } else {
+              // reduce speed slightly if can't change lanes
+               if (closest_car_ahead_dist > 0 ) {
+                 mycar_target_speed = min(car_ahead_speed, MAX_SPEED);
+              }
+            }
+
+            
+
+            for(int i=0; i<3; i++) {
+                  vector<double> tmp_xy = getXY(start[0] + BUFFER_DIST*(i+1), 2.0 + 4.0 * lane, 
+                                                map_waypoints_s, map_waypoints_x, map_waypoints_y);
+                  pts_x.push_back(tmp_xy[0]);
+                  pts_y.push_back(tmp_xy[1]);
+              }
             
 
             // Now shift those coordinates to car- coordinates
@@ -583,18 +635,20 @@ int main() {
             tk::spline spl;            
             spl.set_points(pts_x, pts_y);
 
-            double point_x_ahead;
+            double point_x_ahead=BUFFER_DIST;
             // no. of steps it takes to get there at target speed
 
+            /*
             if (lane_change && target_lane>=0) {
               // should add about 125 new points, but its okay, I guess!!
               additional_pts = LANE_CHANGE_TIME_LIM / TIME_DELTA + 20;
               point_x_ahead = LANE_CHANGE_TIME_LIM * prev_speed * 2;             
             } else {
               // random ahead point
-              point_x_ahead = 30.;
+              point_x_ahead = BUFFER_DIST;
               
             }
+            */
 
             double point_y_ahead = spl(point_x_ahead);
             double dist_ahead = sqrt(point_x_ahead*point_x_ahead + point_y_ahead*point_y_ahead);

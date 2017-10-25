@@ -25,9 +25,11 @@ vector<double> get_lane_change_poly(int from_lane, int to_lane, double dt, doubl
 /**
 Can we change lanes to a given lane. 
 Check for future positions of cars in that lane, and see if there is a clash. 
-Return false early, if there is
+Return false early, if there is, 
+-ve cost is false,
+if +ve value lane can be changed but may use the cost to compare with other actions
 **/
-bool can_change_lane_to(vector<vector<double>> cars_in_lane, double my_speed, double car_ahead_speed, 
+double cost_of_changing_lane_to(vector<vector<double>> cars_in_lane, double my_speed, double car_ahead_speed, 
 												double cur_s, double time_limit, 
 												int prev_path_size, double dt);
 /**
