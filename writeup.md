@@ -49,7 +49,23 @@ These are defined in main.cpp as constant values. Important ones are:
     const double CAR_BEHIND_RANGE = -MAX_SPEED *1;
 </code>
 
-  For that we have a cost function described below. 
+	The above describe the range ahead an behind we need to look for the cars. 
+
+  Once we have that after checking the speed of the car immediately ahead of us, if needed we invoke the lane changing cost functions described below. 
+
+##### Lane changing cost function
+<code>
+	
+//Can we change lanes to a given lane. 
+//Check for future positions of cars in that lane, and see if there is a clash. 
+//Return false early, if there is, 
+//-ve cost is false,
+//if +ve value lane can be changed but may use the cost to compare with other actions
+
+double cost_of_changing_lane_to(vector<vector<double>> cars_in_lane, double my_speed, double car_ahead_speed, 
+												double cur_s, double time_limit, 
+												int prev_path_size, double dt);
+</code>
 
 #### Other notes
 1. We first set the accleration to 9 m/s^2. Else it mysteriously goes above threshold in console. Finally had to keep it at 6 m/s^2. Which resulted in no violations of acceleration.
