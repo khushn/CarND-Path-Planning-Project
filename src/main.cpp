@@ -288,7 +288,8 @@ int main() {
 
           	json msgJson;
 
-            const double MAX_SPEED = 22.0;
+            const double SPEED_LIM_MILES = 49.;
+            const double MAX_SPEED = SPEED_LIM_MILES * 1.60934 * 1000 / (60 * 60);
             //const double MAX_SPEED = 22.22; // 22 metres/ sec translates to 50 miles/hr
             const double MAX_ACCL = 6.0; // 10 metre/sec^2
             const double MAX_JERK = 10.0; // 10 metre/sec^3
@@ -583,7 +584,7 @@ int main() {
             */
 
             // was 30 in the intsuctor video
-            const double BUFFER_DIST = 30.; 
+            const double BUFFER_DIST = 35.; 
 
             if ( lane_change && target_lane >=0 ) {
               cout << "Changing lanes to: " << target_lane << endl;
