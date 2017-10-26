@@ -20,7 +20,7 @@ So since our x and y values could be in any direction, if we use them as is to f
 #### Important thresolds
 These are defined in main.cpp as constant values. Important ones are: 
 <code>
-	<blockquote>
+
 	const double SPEED_LIM_MILES = 49.;
 
     const double MAX_SPEED = SPEED_LIM_MILES * 1.60934 * 1000 / (60 * 60);    
@@ -32,8 +32,7 @@ These are defined in main.cpp as constant values. Important ones are:
     const double TIME_DELTA = .020; // 20 milisec
 
     const int N = 50; // points into future
-    
-    </blockquote>
+
 </code>
 
 
