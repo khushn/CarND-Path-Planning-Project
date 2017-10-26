@@ -33,10 +33,22 @@ These are defined in main.cpp as constant values. Important ones are:
 
     const int N = 50; // points into future
 
+    BUFFER_DIST = 35.; // This is the distance in metres it uses to change lanes. Upper limit.
+
 </code>
 
 
-1. We set the accleration to 9 m/s^2. Else it mysteriously goes above threshold in console. 
+#### Core Model
+  We just move the car in the starting lane, gradually reaching a speed of just below 50 mph. If the car ahead of us is moving slowly we explore lane change options. The core logic starts at line 417 in main.cpp . Starting with laying out some thresholds to use on the Sensor fusion data. 
+  <code> 
+  	 const double CAR_AHEAD_RANGE = MAX_SPEED * 1;
+  	 
+     const double CAR_BEHIND_RANGE = -MAX_SPEED *1;
+  </code>
+  For that we have a cost function described below. 
+
+#### Other notes
+1. We first set the accleration to 9 m/s^2. Else it mysteriously goes above threshold in console. Finally had to keep it at 6 m/s^2. Which resulted in no violations of acceleration.
 2. The function get_distance_fractions() is used to get the points along the distance (s) frenet, based on appropriate velocity, acceleration and jerk values.
 3. It is observed that Spline gives a better result for lane change as well, compared to generating poly coefficients using 'Quintic Polynomial Solver'
 4. Using a cost model, for lane changing. Calculate the cost of lane change. Higher cost for crowded lane with lower average speed.
@@ -44,5 +56,14 @@ These are defined in main.cpp as constant values. Important ones are:
 
 
 
-##### TODO
+#### TODO
 1. Record a video of car running 
+
+
+### References
+
+1. Project walkthrough video, was very helpful. 
+	https://www.youtube.com/watch?v=7sI3VHFPP0w
+
+2. Good resource for transformation (shifting and rotation) of points in a 2-d plane to a different reference axis. 
+https://www.math10.com/en/geometry/analytic-geometry/geometry1/coordinates-transformation.html
