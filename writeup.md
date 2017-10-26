@@ -101,7 +101,9 @@ This project was quite challenging. The most difficult part being ensuring the c
 
 I followed the process of first trying out myself, before looking at the walkthrough video. So in the process, I struggled a bit, e.g. with Quintic solver, but I also feel, it was a better approach as I learnt more by it. Also for some of the things like lane changing model, I was able to develop on my own. Which also can be improved further. 
 
-All my unsuccessful attempts are left as commented code and also as unused code in trajectory_gen.[h/cpp] files. Only the functions mentioned above and a few more like get_lane_from_d() are used. 
+All my unsuccessful attempts are left as commented code and also as unused code in trajectory_gen.[h/cpp] files. Only the functions mentioned above and a few more like get_lane_from_d() are used.
+
+But finally am glad to make it work, as expected and I tested the car looping for at least two separate rounds  without any incident.
 
 #### Appendix
 
