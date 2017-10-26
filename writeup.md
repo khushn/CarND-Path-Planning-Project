@@ -76,6 +76,14 @@ These are defined in main.cpp as constant values. Important ones are:
 
 </code>
 
+The above function returns a cost of changing to a lane (left or right), we compare the costs and plan to move to a lane with a lower cost. The things considered for cost are: 
+
+* How crowded is a lane? If more cars are present in the range, then higher the cost
+* average speed of the lane: This is calculated by averaging the speeds of the cars in the lane. Also cost is higher if speed is slower than Ego car. 
+
+
+
+
 #### Other notes
 1. We first set the accleration to 9 m/s^2. Else it mysteriously goes above threshold in console. Finally had to keep it at 6 m/s^2. Which resulted in no violations of acceleration.
 2. The function get_distance_fractions() is used to get the points along the distance (s) frenet, based on appropriate velocity, acceleration and jerk values.
