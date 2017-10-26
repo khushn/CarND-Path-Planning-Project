@@ -1,4 +1,0 @@
-# Target labels
- BuildUnsupported
-# Source files and their labels
-/home/khush/self_driving_car/CarND-Path-Planning-Project/src/Eigen-3.3/unsupported/test/kronecker_product.cpp
