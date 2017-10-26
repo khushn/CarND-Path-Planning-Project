@@ -96,13 +96,21 @@ Once the target_lane is decided, the same logic (spline and get_distance_fractio
 If for some reason, the lane can't be changed, we just gradually decrease the Ego car's speed to match the speed of the car ahead of us. 
 
 
+#### Summary
+This project was quite challenging. The most difficult part being ensuring the car has acceleration and jerk within limits. Spline was helpful in that regard. In future, if possible, I would like make it work using the 'Quintic Polynomial solver' as well. 
+
+I followed the process of first trying out myself, before looking at the walkthrough video. So in the process, I struggled a bit, e.g. with Quintic solver, but I also feel, it was a better approach as I learnt more by it. Also for some of the things like lane changing model, I was able to develop on my own. Which also can be improved further. 
+
+All my unsuccessful attempts are left as commented code and also as unused code in trajectory_gen.[h/cpp] files. Only the functions mentioned above and a few more like get_lane_from_d() are used. 
+
 #### Appendix
 
-##### Other notes
+##### Other notes and attempts
 1. We first set the accleration to 9 m/s^2. Else it mysteriously goes above threshold in console. Finally had to keep it at 6 m/s^2. Which resulted in no violations of acceleration.
 2. The function get_distance_fractions() is used to get the points along the distance (s) frenet, based on appropriate velocity, acceleration and jerk values.
 3. It is observed that Spline gives a better result for lane change as well, compared to generating poly coefficients using 'Quintic Polynomial Solver'
 4. Using a cost model, for lane changing. Calculate the cost of lane change. Higher cost for crowded lane with lower average speed.
+5. clean_normal_jerk() was the function I wrote to clean up the jerks and acceleration exceeding limits with Quintic solver. Presently its unused.
 
 
 
@@ -118,3 +126,6 @@ If for some reason, the lane can't be changed, we just gradually decrease the Eg
 
 2. Good resource for transformation (shifting and rotation) of points in a 2-d plane to a different reference axis. 
 https://www.math10.com/en/geometry/analytic-geometry/geometry1/coordinates-transformation.html
+
+3. Spline library
+ http://kluge.in-chemnitz.de/opensource/spline/
