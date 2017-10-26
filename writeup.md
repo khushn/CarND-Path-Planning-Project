@@ -65,12 +65,14 @@ These are defined in main.cpp as constant values. Important ones are:
 
 //if +ve value lane can be changed but may use the cost to compare with other actions
 
-double cost_of_changing_lane_to(vector<vector<double>> cars_in_lane, 
+// The function definition is in trajectory_gen.cpp line 66.
+
+	double cost_of_changing_lane_to(vector<vector<double>> cars_in_lane, 
 												double my_speed, double car_ahead_speed, 
 												double cur_s, double time_limit, 
 												int prev_path_size, double dt);
 
-The function definition is in trajectory_gen.cpp line 66.												
+												
 
 </code>
 
