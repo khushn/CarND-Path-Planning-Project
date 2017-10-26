@@ -40,11 +40,14 @@ These are defined in main.cpp as constant values. Important ones are:
 
 #### Core Model
   We just move the car in the starting lane, gradually reaching a speed of just below 50 mph. If the car ahead of us is moving slowly we explore lane change options. The core logic starts at line 417 in main.cpp . Starting with laying out some thresholds to use on the Sensor fusion data. 
-  <code> 
+
+
+ <code> 
   	 const double CAR_AHEAD_RANGE = MAX_SPEED * 1;
-  	 
+
      const double CAR_BEHIND_RANGE = -MAX_SPEED *1;
-  </code>
+ </code>
+ 
   For that we have a cost function described below. 
 
 #### Other notes
