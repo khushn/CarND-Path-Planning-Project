@@ -1,8 +1,10 @@
 ### Path Planning Project notes and Model Documentation
 
 
-#### Spline 
+#### Trajectory generation and smoothing using Spline 
 At first I tried to use <i>Quintic Polynomial Solver</i> for smoothing the path generated, but it was quite problematice. So I shifted to using Spline, as advised in the project walkthrough video. Using spline, immidiately gave a better path. 
+
+trajectory_gen.[h/cpp] have a get_distance_fractions() function, which is helpful to get the points spaced appropriately from the curve fitted using spline. This function also ensures the points are spaced to meet the speed/acceleration/jerl thresholds. 
 
 
 #### Using of previous path
@@ -82,9 +84,21 @@ The above function returns a cost of changing to a lane (left or right), we comp
 * average speed of the lane: This is calculated by averaging the speeds of the cars in the lane. Also cost is higher if speed is slower than Ego car. 
 
 
+##### State model of the lane changing. 
+We just use 3 state transtions 'KL', 'LCL', 'LCR' and a single state variable i.e. current lane. Did not feel the need for using 'PLCL'/'PLCR' in my project so far. 
+
+The state model is intrinsic to the logic pointed to above in main.cpp, so there is no need to have a separate function for it, by me. May be if it evolves to more complicated stuff, it can have its own class/functions as needed.
 
 
-#### Other notes
+Once the target_lane is decided, the same logic (spline and get_distance_fractions() function) described at the top of this document is used to get the lane changing path. In this case however, we just generate a few extra points after the lane has been changed to ensure continuity in the target_lane. 
+
+#### Slowing down of Ego car's speed
+If for some reason, the lane can't be changed, we just gradually decrease the Ego car's speed to match the speed of the car ahead of us. 
+
+
+#### Appendix
+
+##### Other notes
 1. We first set the accleration to 9 m/s^2. Else it mysteriously goes above threshold in console. Finally had to keep it at 6 m/s^2. Which resulted in no violations of acceleration.
 2. The function get_distance_fractions() is used to get the points along the distance (s) frenet, based on appropriate velocity, acceleration and jerk values.
 3. It is observed that Spline gives a better result for lane change as well, compared to generating poly coefficients using 'Quintic Polynomial Solver'
@@ -93,7 +107,7 @@ The above function returns a cost of changing to a lane (left or right), we comp
 
 
 
-#### TODO
+##### TODO
 1. Record a video of car running 
 
 
